@@ -1,0 +1,796 @@
+'use client';
+
+import React, { useEffect, useLayoutEffect, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Card,
+  CardContent,
+  CardFooter,
+} from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+import {
+  ArrowRight,
+  Eye,
+  EyeOff,
+  Loader2,
+  Lock,
+  Mail,
+  MessagesSquare,
+  Shield,
+  User,
+  UserPlus,
+  Zap,
+} from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { SeungChatLogo } from '@/components/seung-chat-logo';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { OtpInput } from '@/components/otp-input';
+import { OTP_EXPIRY_SECONDS } from '@/lib/auth-utils';
+import {
+  clearSignupSession,
+  getOtpSecondsLeft,
+  loadSignupSession,
+  saveSignupSession,
+} from '@/lib/signup-session';
+
+const features = [
+  {
+    icon: UserPlus,
+    title: 'Quick registration',
+    description: 'Create your profile in minutes with a simple, secure form.',
+  },
+  {
+    icon: Zap,
+    title: 'Start messaging',
+    description: 'Connect with others as soon as your account is ready.',
+  },
+  {
+    icon: Shield,
+    title: 'Your data, protected',
+    description: 'Personal details are stored securely and never shared.',
+  },
+];
+
+const chatPreview = [
+  { from: 'them' as const, text: 'Welcome to Seung! Glad you joined us.' },
+  { from: 'me' as const, text: 'Thanks! Excited to get started.' },
+  { from: 'them' as const, text: 'Your account is all set. Say hello!' },
+];
+
+function TypingIndicator() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 6 }}
+      className="flex justify-start"
+    >
+      <div className="flex items-center gap-1 rounded-2xl rounded-bl-md bg-background/15 px-3.5 py-2.5">
+        {[0, 1, 2].map((i) => (
+          <motion.span
+            key={i}
+            className="size-1.5 rounded-full bg-background/50"
+            animate={{ opacity: [0.3, 1, 0.3], y: [0, -2, 0] }}
+            transition={{
+              duration: 0.9,
+              repeat: Infinity,
+              delay: i * 0.15,
+              ease: 'easeInOut',
+            }}
+          />
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function AnimatedChatPreview({ contentDelay = 0.9 }: { contentDelay?: number }) {
+  const prefersReducedMotion = useReducedMotion();
+  const [visibleCount, setVisibleCount] = useState(0);
+  const [showTyping, setShowTyping] = useState(false);
+
+  useEffect(() => {
+    if (prefersReducedMotion) {
+      setVisibleCount(chatPreview.length);
+      return;
+    }
+
+    let active = true;
+
+    (async () => {
+      while (active) {
+        setVisibleCount(0);
+        setShowTyping(false);
+        await delay(500);
+
+        for (let i = 0; i < chatPreview.length; i++) {
+          if (!active) return;
+
+          setShowTyping(true);
+          await delay(1100);
+          if (!active) return;
+
+          setShowTyping(false);
+          setVisibleCount(i + 1);
+          await delay(350);
+        }
+
+        await delay(2800);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [prefersReducedMotion]);
+
+  const visibleMessages = chatPreview.slice(0, visibleCount);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: contentDelay }}
+      className="space-y-3 rounded-xl border border-background/15 bg-background/5 p-4"
+    >
+      <div className="flex items-center gap-2 border-b border-background/10 pb-3">
+        <div className="relative flex size-8 items-center justify-center rounded-full bg-background/15">
+          <MessagesSquare className="size-3.5" strokeWidth={1.75} />
+          <motion.span
+            className="absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full border-2 border-foreground bg-background"
+            animate={{ scale: [1, 1.2, 1] }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+          />
+        </div>
+        <div>
+          <p className="text-sm font-medium">Welcome Chat</p>
+          <p className="text-xs text-background/50">New member joined</p>
+        </div>
+      </div>
+
+      <div className="space-y-2.5">
+        <AnimatePresence mode="popLayout">
+          {visibleMessages.map((message, index) => (
+            <motion.div
+              key={`${message.text}-${index}`}
+              layout
+              initial={{ opacity: 0, x: message.from === 'me' ? 24 : -24, y: 8 }}
+              animate={{ opacity: 1, x: 0, y: 0 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+              className={cn(
+                'flex',
+                message.from === 'me' ? 'justify-end' : 'justify-start'
+              )}
+            >
+              <div
+                className={cn(
+                  'max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed',
+                  message.from === 'me'
+                    ? 'rounded-br-md bg-background text-foreground'
+                    : 'rounded-bl-md bg-background/15 text-background'
+                )}
+              >
+                {message.text}
+              </div>
+            </motion.div>
+          ))}
+          {showTyping && <TypingIndicator key="typing" />}
+        </AnimatePresence>
+      </div>
+    </motion.div>
+  );
+}
+
+export default function SignUpPage() {
+  const router = useRouter();
+  const prefersReducedMotion = useReducedMotion();
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [otpExpiresAt, setOtpExpiresAt] = useState<number | null>(null);
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [isSessionReady, setIsSessionReady] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/auth/me')
+      .then((res) => {
+        if (!active) return null;
+        if (res.ok) {
+          router.replace('/seung_chat');
+          return null;
+        }
+        return null;
+      })
+      .finally(() => {
+        if (active) setCheckingSession(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [router]);
+
+  useLayoutEffect(() => {
+    const session = loadSignupSession();
+    if (session) {
+      setEmail(session.email);
+      setFullName(session.fullName);
+      setOtpSent(session.otpSent);
+      setEmailVerified(session.emailVerified);
+      setOtpExpiresAt(session.otpExpiresAt);
+      setSecondsLeft(getOtpSecondsLeft(session.otpExpiresAt));
+    }
+    setIsSessionReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isSessionReady) return;
+
+    saveSignupSession({
+      email,
+      fullName,
+      otpSent,
+      emailVerified,
+      otpExpiresAt,
+    });
+  }, [email, fullName, otpSent, emailVerified, otpExpiresAt, isSessionReady]);
+
+  useEffect(() => {
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.documentElement.style.overflow = '';
+      document.body.style.overflow = '';
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!otpSent || emailVerified || !otpExpiresAt) return;
+
+    const tick = () => setSecondsLeft(getOtpSecondsLeft(otpExpiresAt));
+    tick();
+
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [otpSent, emailVerified, otpExpiresAt]);
+
+  function resetOtpState() {
+    setOtpSent(false);
+    setEmailVerified(false);
+    setOtp('');
+    setOtpExpiresAt(null);
+    setSecondsLeft(0);
+  }
+
+  async function sendOtp() {
+    setError('');
+    setSuccess('');
+
+    if (!email.trim()) {
+      setError('Enter your email address first.');
+      return;
+    }
+
+    setIsSendingOtp(true);
+
+    try {
+      const response = await fetch('/api/signup/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error ?? 'Failed to send verification code.');
+        return;
+      }
+
+      setOtpSent(true);
+      setEmailVerified(false);
+      setOtp('');
+      const expiresIn = data.expiresIn ?? OTP_EXPIRY_SECONDS;
+      setOtpExpiresAt(Date.now() + expiresIn * 1000);
+      setSecondsLeft(expiresIn);
+      setSuccess('Verification code sent to your email.');
+    } catch {
+      setError('Unable to send verification code. Please try again.');
+    } finally {
+      setIsSendingOtp(false);
+    }
+  }
+
+  async function verifyOtp() {
+    setError('');
+    setSuccess('');
+
+    if (secondsLeft <= 0) {
+      setError('Code expired. Please resend a new verification code.');
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+
+    try {
+      const response = await fetch('/api/signup/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code: otp }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error ?? 'Invalid verification code.');
+        return;
+      }
+
+      setEmailVerified(true);
+      setSuccess('Email verified. Complete the rest of the form.');
+    } catch {
+      setError('Verification failed. Please try again.');
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  }
+
+  async function onSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    setError('');
+    setSuccess('');
+
+    if (!emailVerified) {
+      setError('Please verify your email with the OTP first.');
+      return;
+    }
+
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('/api/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName,
+          email,
+          password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error ?? 'Something went wrong. Please try again.');
+        return;
+      }
+
+      clearSignupSession();
+      router.push('/signin');
+    } catch {
+      setError('Unable to connect. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  const panelSpring = prefersReducedMotion
+    ? { duration: 0 }
+    : { type: 'spring' as const, stiffness: 65, damping: 18 };
+
+  const contentReveal = prefersReducedMotion
+    ? {}
+    : {
+        initial: { opacity: 0, y: 14 },
+        animate: { opacity: 1, y: 0 },
+        transition: { duration: 0.45, delay: 0.75 },
+      };
+
+  const fieldMotion = (delay: number) =>
+    prefersReducedMotion
+      ? {}
+      : {
+          initial: { opacity: 0, y: 10 },
+          animate: { opacity: 1, y: 0 },
+          transition: { duration: 0.4, delay },
+        };
+
+  if (checkingSession) {
+    return (
+      <div className="flex h-dvh items-center justify-center bg-background">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative grid h-dvh overflow-hidden overscroll-none bg-background lg:grid-cols-2">
+      <div className="absolute top-4 right-4 z-20">
+        <ThemeToggle className="text-muted-foreground hover:bg-muted hover:text-foreground" />
+      </div>
+      {!prefersReducedMotion && (
+        <motion.div
+          className="pointer-events-none absolute inset-y-0 left-1/2 z-10 hidden w-px -translate-x-1/2 bg-border lg:block"
+          initial={{ scaleY: 0, opacity: 1 }}
+          animate={{ scaleY: 1, opacity: 0 }}
+          transition={{ duration: 0.6, delay: 0.35, ease: 'easeOut' }}
+        />
+      )}
+
+      <motion.div
+        className="relative hidden h-full min-h-0 flex-col justify-between overflow-hidden bg-foreground px-10 py-8 text-background lg:flex"
+        initial={prefersReducedMotion ? false : { x: '-100%' }}
+        animate={{ x: 0 }}
+        transition={panelSpring}
+      >
+        <SeungChatLogo variant="dark" typewriterDelay={650} markSize={40} />
+
+        <div className="max-w-md space-y-6">
+          <motion.div className="space-y-3" {...contentReveal}>
+            <h1 className="text-3xl font-semibold tracking-tight text-balance">
+              Join Seung. Start connecting.
+            </h1>
+            <p className="text-sm leading-relaxed text-background/70">
+              Create your account and become part of a simple, secure messaging
+              experience built for real conversations.
+            </p>
+          </motion.div>
+
+          <AnimatedChatPreview contentDelay={0.95} />
+
+          <ul className="space-y-3">
+            {features.map((feature, index) => (
+              <motion.li
+                key={feature.title}
+                className="flex gap-4"
+                initial={prefersReducedMotion ? false : { opacity: 0, x: -16 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.45, delay: 0.85 + index * 0.1 }}
+              >
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-background/15 bg-background/5">
+                  <feature.icon className="size-4" strokeWidth={1.75} />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">{feature.title}</p>
+                  <p className="text-sm leading-relaxed text-background/60">
+                    {feature.description}
+                  </p>
+                </div>
+              </motion.li>
+            ))}
+          </ul>
+        </div>
+
+        <motion.p
+          className="text-xs text-background/50"
+          initial={prefersReducedMotion ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 1.1 }}
+        >
+          © {new Date().getFullYear()} Seung. All rights reserved.
+        </motion.p>
+      </motion.div>
+
+      <motion.div
+        className="relative flex h-full min-h-0 flex-col items-center justify-center overflow-y-auto px-6 py-6 lg:px-12"
+        initial={prefersReducedMotion ? false : { x: '100%' }}
+        animate={{ x: 0 }}
+        transition={panelSpring}
+      >
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(0,0,0,0.03),transparent_50%)]" />
+
+        <motion.div
+          className="relative w-full max-w-2xl space-y-6"
+          initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.75 }}
+        >
+          <div className="space-y-6">
+            <div className="lg:hidden">
+              <SeungChatLogo variant="light" typewriterDelay={750} markSize={44} />
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="text-3xl font-semibold tracking-tight">
+                Create account
+              </h2>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Fill in your details below to register on Seung.
+              </p>
+            </div>
+          </div>
+
+          <Card className="gap-0 overflow-hidden border-border/50 py-0 shadow-none ring-1 ring-foreground/8">
+            <CardContent className="p-0">
+              <form onSubmit={onSubmit} className="divide-y divide-border/60">
+                <div className="space-y-4 p-6">
+                  <motion.div
+                    className="grid items-start gap-3 sm:grid-cols-[7.5rem_minmax(0,1fr)]"
+                    {...fieldMotion(0.85)}
+                  >
+                    <Label
+                      htmlFor={emailVerified ? undefined : otpSent ? 'otp' : 'email'}
+                      className="pt-2.5 text-xs font-medium tracking-wide uppercase text-muted-foreground sm:text-right"
+                    >
+                      {emailVerified ? 'Email' : otpSent ? 'Code' : 'Email'}
+                    </Label>
+                    <div className="flex min-w-0 flex-col gap-2">
+                      {emailVerified ? (
+                        <div className="flex items-center gap-2 rounded-md border border-foreground/15 bg-muted/30 px-3 py-2.5">
+                          <Mail className="size-3.5 shrink-0 text-muted-foreground" />
+                          <span className="truncate text-xs text-muted-foreground">{email}</span>
+                          <span className="ml-auto text-xs font-medium text-foreground">Verified</span>
+                        </div>
+                      ) : otpSent ? (
+                        <>
+                          <div className="flex items-center justify-between gap-3 rounded-md border border-border/50 bg-muted/20 px-3 py-2">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <Mail className="size-3.5 shrink-0 text-muted-foreground" />
+                              <span className="truncate text-xs text-muted-foreground">{email}</span>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                              {secondsLeft > 0 ? (
+                                <span
+                                  className={cn(
+                                    'text-xs font-medium tabular-nums',
+                                    secondsLeft <= 10 ? 'text-destructive' : 'text-muted-foreground'
+                                  )}
+                                >
+                                  0:{String(secondsLeft).padStart(2, '0')}
+                                </span>
+                              ) : null}
+                              <button
+                                type="button"
+                                onClick={sendOtp}
+                                disabled={isSendingOtp || secondsLeft > 0}
+                                className={cn(
+                                  'text-xs font-medium transition-colors',
+                                  isSendingOtp || secondsLeft > 0
+                                    ? 'cursor-not-allowed text-muted-foreground/50'
+                                    : 'text-foreground hover:underline'
+                                )}
+                              >
+                                {isSendingOtp ? 'Sending...' : 'Resend'}
+                              </button>
+                              <span className="text-muted-foreground/40">·</span>
+                              <button
+                                type="button"
+                                onClick={resetOtpState}
+                                className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground hover:underline"
+                              >
+                                Change
+                              </button>
+                            </div>
+                          </div>
+                          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <OtpInput
+                              id="otp"
+                              value={otp}
+                              onChange={setOtp}
+                              autoFocus
+                              disabled={isVerifyingOtp || secondsLeft <= 0}
+                            />
+                            <Button
+                              type="button"
+                              className="h-11 shrink-0 sm:min-w-[9.5rem]"
+                              disabled={isVerifyingOtp || otp.length !== 6 || secondsLeft <= 0}
+                              onClick={verifyOtp}
+                            >
+                              {isVerifyingOtp ? (
+                                <>
+                                  <Loader2 className="animate-spin" />
+                                  Verifying...
+                                </>
+                              ) : (
+                                'Verify email'
+                              )}
+                            </Button>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+                          <div className="relative min-w-0 flex-1">
+                            <Mail className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              id="email"
+                              type="email"
+                              placeholder="abc@email.com"
+                              autoCapitalize="none"
+                              autoComplete="email"
+                              autoCorrect="off"
+                              disabled={isLoading || emailVerified}
+                              value={email}
+                              onChange={(e) => {
+                                setEmail(e.target.value);
+                                if (otpSent || emailVerified) resetOtpState();
+                              }}
+                              className="h-11 border-border/70 bg-muted/30 pl-10 transition-colors focus-visible:bg-background"
+                              required
+                            />
+                          </div>
+                          {!emailVerified && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-11 shrink-0 sm:min-w-[9.5rem]"
+                              disabled={isSendingOtp || !email.trim()}
+                              onClick={sendOtp}
+                            >
+                              {isSendingOtp ? (
+                                <>
+                                  <Loader2 className="animate-spin" />
+                                  Sending...
+                                </>
+                              ) : (
+                                'Send code'
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <motion.div
+                      className="grid items-center gap-3 sm:grid-cols-[7.5rem_minmax(0,1fr)] md:grid-cols-1 md:gap-2"
+                      {...fieldMotion(0.95)}
+                    >
+                      <Label
+                        htmlFor="fullName"
+                        className="text-xs font-medium tracking-wide uppercase text-muted-foreground sm:text-right md:text-left"
+                      >
+                        Full name
+                      </Label>
+                      <div className="relative min-w-0">
+                        <User className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          id="fullName"
+                          type="text"
+                          placeholder="John Doe"
+                          autoComplete="name"
+                          disabled={isLoading || !emailVerified}
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          className="h-11 border-border/70 bg-muted/30 pl-10 transition-colors focus-visible:bg-background disabled:opacity-50"
+                          required
+                        />
+                      </div>
+                    </motion.div>
+
+                    <motion.div
+                      className="grid items-center gap-3 sm:grid-cols-[7.5rem_minmax(0,1fr)] md:grid-cols-1 md:gap-2"
+                      {...fieldMotion(1.05)}
+                    >
+                      <Label
+                        htmlFor="password"
+                        className="text-xs font-medium tracking-wide uppercase text-muted-foreground sm:text-right md:text-left"
+                      >
+                        Password
+                      </Label>
+                      <div className="relative min-w-0">
+                        <Lock className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          id="password"
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder="At least 8 characters"
+                          autoComplete="new-password"
+                          disabled={isLoading || !emailVerified}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="h-11 border-border/70 bg-muted/30 pr-10 pl-10 transition-colors focus-visible:bg-background disabled:opacity-50"
+                          required
+                          minLength={8}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword((prev) => !prev)}
+                          className="absolute top-1/2 right-3.5 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                        </button>
+                      </div>
+                    </motion.div>
+                  </div>
+
+                  {(success || error) && (
+                    <div className="space-y-2">
+                      {success && (
+                        <p className="rounded-md border border-foreground/15 bg-muted/30 px-3 py-2 text-sm text-foreground">
+                          {success}
+                        </p>
+                      )}
+                      {error && (
+                        <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                          {error}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-muted/20 p-6">
+                  <motion.div {...fieldMotion(1.15)}>
+                    <Button
+                      type="submit"
+                      className="h-11 w-full text-sm font-medium"
+                      size="lg"
+                      disabled={isLoading || !emailVerified}
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="animate-spin" />
+                          Creating account...
+                        </>
+                      ) : (
+                        <>
+                          Create account
+                          <ArrowRight />
+                        </>
+                      )}
+                    </Button>
+                  </motion.div>
+                </div>
+              </form>
+            </CardContent>
+
+            <CardFooter className="justify-center border-t border-border/60 bg-muted/10 py-5">
+              <p className="text-sm text-muted-foreground">
+                Already have an account?{' '}
+                <Link
+                  href="/signin"
+                  className="font-medium text-foreground underline-offset-4 transition-colors hover:underline"
+                >
+                  Sign in
+                </Link>
+              </p>
+            </CardFooter>
+          </Card>
+
+          <motion.p
+            className="text-center text-xs leading-relaxed text-muted-foreground"
+            initial={prefersReducedMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.45, delay: 1.25 }}
+          >
+            By registering, you agree to our{' '}
+            <Link href="/terms" className="underline underline-offset-4 transition-colors hover:text-foreground">
+              Terms
+            </Link>{' '}
+            and{' '}
+            <Link href="/privacy" className="underline underline-offset-4 transition-colors hover:text-foreground">
+              Privacy Policy
+            </Link>
+            .
+          </motion.p>
+        </motion.div>
+      </motion.div>
+    </div>
+  );
+}

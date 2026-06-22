@@ -19,6 +19,8 @@
 
 # production
 /build
+/release
+/desktop/dist
 
 # misc
 .DS_Store
@@ -39,3 +41,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# prisma generated client
+/lib/generated/
+
+# whatsapp-web.js session data (locked files crash Turbopack/Tailwind scans)
+.wwebjs_auth/
+.wwebjs_cache/

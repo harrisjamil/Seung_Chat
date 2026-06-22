@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Seung — Cannot connect</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: #0a0a0a;
+        color: #fafafa;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        padding: 2rem;
+      }
+      .card {
+        max-width: 520px;
+        width: 100%;
+        background: #171717;
+        border: 1px solid #262626;
+        border-radius: 16px;
+        padding: 2rem;
+        text-align: center;
+      }
+      h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
+      p { margin: 0.5rem 0; color: #a3a3a3; line-height: 1.5; }
+      code {
+        background: #262626;
+        padding: 0.15rem 0.4rem;
+        border-radius: 6px;
+        color: #e5e5e5;
+      }
+      .url {
+        margin: 1rem 0;
+        padding: 0.75rem 1rem;
+        background: #0a0a0a;
+        border: 1px solid #333;
+        border-radius: 8px;
+        word-break: break-all;
+        color: #d4d4d4;
+        font-size: 0.9rem;
+      }
+      button {
+        margin-top: 1.25rem;
+        background: #fafafa;
+        color: #0a0a0a;
+        border: none;
+        border-radius: 8px;
+        padding: 0.7rem 1.25rem;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:hover { background: #e5e5e5; }
+      ol {
+        text-align: left;
+        color: #a3a3a3;
+        line-height: 1.6;
+        padding-left: 1.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Cannot connect to Seung</h1>
+      <p>The desktop app could not reach your server.</p>
+      <div class="url" id="server-url"></div>
+      <ol>
+        <li>Open a terminal in your project folder</li>
+        <li>Run <code>npm run dev</code></li>
+        <li>Click Retry below</li>
+      </ol>
+      <p>Or set <code>SEUNG_SERVER_URL</code> in a <code>seung.env</code> file next to Seung.exe.</p>
+      <button type="button" onclick="window.seungDesktop?.retryConnection?.()">Retry connection</button>
+    </div>
+    <script>
+      window.seungDesktop?.getServerUrl?.().then((url) => {
+        document.getElementById('server-url').textContent = url;
+      });
+    </script>
+  </body>
+</html>

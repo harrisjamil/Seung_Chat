@@ -1,0 +1,52 @@
+{
+  "name": "seung",
+  "version": "0.1.0",
+  "description": "Seung desktop client",
+  "author": "Seung",
+  "private": true,
+  "main": "dist/main.js",
+  "build": {
+    "appId": "com.seung.chat",
+    "productName": "Seung",
+    "electronVersion": "36.9.5",
+    "directories": {
+      "output": "../release"
+    },
+    "files": [
+      "dist/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "npmRebuild": false,
+    "extraResources": [
+      {
+        "from": "assets/seung.env.example",
+        "to": "seung.env.example"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/icon.png"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "assets/icon.png"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Seung"
+    }
+  }
+}

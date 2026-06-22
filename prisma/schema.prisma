@@ -1,0 +1,156 @@
+// Seung — database schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ConnectionStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum NotificationType {
+  CONNECTION_REQUEST
+  CONNECTION_ACCEPTED
+  CONNECTION_REJECTED
+}
+
+enum LoginAlertStatus {
+  PENDING
+  CONFIRMED
+  DENIED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  fullName  String   @map("full_name")
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  sessions            Session[]
+  loginAlerts         LoginAlert[]
+  sentConnections     ConnectionRequest[] @relation("SentConnections")
+  receivedConnections ConnectionRequest[] @relation("ReceivedConnections")
+  notifications       Notification[]
+  sentMessages        DirectMessage[]
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  loginAlert  LoginAlert?
+
+  @@index([token])
+  @@map("sessions")
+}
+
+model LoginAlert {
+  id                 String           @id @default(cuid())
+  userId             String           @map("user_id")
+  sessionId          String?          @unique @map("session_id")
+  token              String           @unique
+  status             LoginAlertStatus @default(PENDING)
+  rememberMe         Boolean          @default(true) @map("remember_me")
+  ip                 String?
+  location           String?
+  deviceName         String?          @map("device_name")
+  hardwareDeviceName String?          @map("hardware_device_name")
+  expiresAt          DateTime         @map("expires_at")
+  respondedAt        DateTime?        @map("responded_at")
+  createdAt          DateTime         @default(now()) @map("created_at")
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session Session? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@map("login_alerts")
+}
+
+model ConnectionRequest {
+  id         String           @id @default(cuid())
+  fromUserId String           @map("from_user_id")
+  toUserId   String           @map("to_user_id")
+  status     ConnectionStatus @default(PENDING)
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+
+  fromUser     User                @relation("SentConnections", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser       User                @relation("ReceivedConnections", fields: [toUserId], references: [id], onDelete: Cascade)
+  conversation DirectConversation?
+
+  @@unique([fromUserId, toUserId])
+  @@map("connection_requests")
+}
+
+model DirectConversation {
+  id                  String   @id @default(cuid())
+  connectionRequestId String   @unique @map("connection_request_id")
+  userAId             String   @map("user_a_id")
+  userBId             String   @map("user_b_id")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  connectionRequest ConnectionRequest @relation(fields: [connectionRequestId], references: [id], onDelete: Cascade)
+  messages          DirectMessage[]
+
+  @@unique([userAId, userBId])
+  @@map("direct_conversations")
+}
+
+model DirectMessage {
+  id             String   @id @default(cuid())
+  conversationId String   @map("conversation_id")
+  senderId       String   @map("sender_id")
+  text           String
+  createdAt      DateTime @default(now()) @map("created_at")
+  readAt         DateTime? @map("read_at")
+
+  conversation DirectConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User               @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@map("direct_messages")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String           @map("user_id")
+  type      NotificationType
+  title     String
+  body      String
+  data      Json?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read, createdAt])
+  @@map("notifications")
+}
+
+model SignupOtp {
+  id        String   @id @default(cuid())
+  email     String
+  code      String
+  expiresAt DateTime @map("expires_at")
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([email])
+  @@map("signup_otps")
+}
